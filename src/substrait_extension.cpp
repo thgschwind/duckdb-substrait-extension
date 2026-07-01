@@ -56,10 +56,22 @@ struct ToSubstraitFunctionData : public TableFunctionData {
 		// The InClauseRewriter optimization converts large `IN` clauses to a
 		// "mark join" against a `ColumnDataCollection`, which may not make
 		// sense in other systems and would complicate the conversion to Substrait.
+		//
+		// STATISTICS_PROPAGATION must be disabled because it uses table
+		// cardinality at plan-generation time to fold queries against empty
+		// tables into LogicalEmptyResult — producing a non-portable plan
+		// (virtualTable {}) that returns 0 rows regardless of runtime data.
+		// A Substrait plan must be valid for any data conforming to the schema.
+		// EMPTY_RESULT_PULLUP is disabled as an additional safeguard: it
+		// propagates LogicalEmptyResult upward through joins/projections, so
+		// if any other pass introduces an empty-result node in the future,
+		// it won't cascade into a fully-folded plan.
 		set<OptimizerType> disabled_optimizers = DBConfig::GetConfig(context).options.disabled_optimizers;
 		disabled_optimizers.insert(OptimizerType::IN_CLAUSE);
 		disabled_optimizers.insert(OptimizerType::COMPRESSED_MATERIALIZATION);
 		disabled_optimizers.insert(OptimizerType::MATERIALIZED_CTE);
+		disabled_optimizers.insert(OptimizerType::STATISTICS_PROPAGATION);
+		disabled_optimizers.insert(OptimizerType::EMPTY_RESULT_PULLUP);
 		// If error(varchar) gets implemented in substrait this can be removed
 		DBConfig::GetConfig(context).SetOption(ScalarSubqueryErrorOnMultipleRowsSetting::Name, false);
 		DBConfig::GetConfig(context).options.disabled_optimizers = disabled_optimizers;
