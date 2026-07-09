@@ -37,13 +37,18 @@ def get_custom_functions():
 	type_set = set()
 	custom_extension_folder  = os.path.join(os.path.dirname(os.path.realpath(__file__)),'..','substrait','extensions')
 	custom_function_paths = next(walk(custom_extension_folder), (None, None, []))[2]
-	for custom_function_path in custom_function_paths:
-		functions = parse_yaml(os.path.join(custom_extension_folder,custom_function_path))
+	for custom_function_file in custom_function_paths:
+		functions = parse_yaml(os.path.join(custom_extension_folder,custom_function_file))
+		custom_function_path = os.path.splitext(custom_function_file)[0]
 		for function in functions:
 			for impls_args in function["impls_args"]:
 				type_str = "{"
 				for args in impls_args: 
 					type_value = regex.sub(r'<[^>]*>', '', args["value"])
+					# Normalize to lowercase: the upstream YAML uses inconsistent
+					# casing (e.g. "DECIMAL<P,S>" for aggregates vs "decimal<P1,S1>"
+					# for scalars). Protobuf field names and our lookup are lowercase.
+					type_value = type_value.lower()
 					if (len(type_value) != 0):
 						type_set.add(type_value)
 						type_str += f"\"{type_value}\","
